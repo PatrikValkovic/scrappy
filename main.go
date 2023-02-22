@@ -7,9 +7,6 @@ func main() {
 	src.LoadEnvironment(logger)
 	logger = src.CreateLogger()
 
-	logger.Debug("Debug message")
-	logger.Info("Info message")
-	logger.Warn("Warning message")
-	logger.Error("Error message")
-	logger.Fatal("Fatal message")
+	args := src.ParseArgs()
+	src.Start(&args, logger)
 }
