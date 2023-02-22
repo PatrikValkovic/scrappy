@@ -1,7 +1,15 @@
 package main
 
-import "fmt"
+import src "github.com/PatrikValkovic/scrappy/src"
 
 func main() {
-	fmt.Println("Hello World")
+	logger := src.CreateLogger()
+	src.LoadEnvironment(logger)
+	logger = src.CreateLogger()
+
+	logger.Debug("Debug message")
+	logger.Info("Info message")
+	logger.Warn("Warning message")
+	logger.Error("Error message")
+	logger.Fatal("Fatal message")
 }
