@@ -29,7 +29,8 @@ func (this *HtmlParser) Process(content *[]byte, location url.URL) (*[]byte, []D
 		return nil, nil, errors.New("Could not parse html")
 	}
 
-	cssDownloads := this.ProcessCss(document)
+	cssDownloads := this.processCss(document)
+	imageDownloads := this.processImages(document)
 
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
@@ -43,13 +44,23 @@ func (this *HtmlParser) Process(content *[]byte, location url.URL) (*[]byte, []D
 	}
 
 	result := buffer.Bytes()
-	return &result, append(
-		[]DownloadArg{},
-		cssDownloads...,
-	), nil
+	return &result, concat([][]DownloadArg{cssDownloads, imageDownloads}), nil
 }
 
-func (this *HtmlParser) ProcessCss(document *goquery.Document) []DownloadArg {
+func concat(slices [][]DownloadArg) []DownloadArg {
+	var totalLen int
+	for _, s := range slices {
+		totalLen += len(s)
+	}
+	tmp := make([]DownloadArg, totalLen)
+	var i int
+	for _, s := range slices {
+		i += copy(tmp[i:], s)
+	}
+	return tmp
+}
+
+func (this *HtmlParser) processCss(document *goquery.Document) []DownloadArg {
 	cssFiles := document.Find("link[rel=\"stylesheet\"]")
 	cssDownloads := make([]DownloadArg, 0)
 	if cssFiles == nil {
@@ -82,4 +93,39 @@ func (this *HtmlParser) ProcessCss(document *goquery.Document) []DownloadArg {
 		})
 	}
 	return cssDownloads
+}
+
+func (this *HtmlParser) processImages(document *goquery.Document) []DownloadArg {
+	imgElements := document.Find("img[src]")
+	imgDownloads := make([]DownloadArg, 0)
+	if imgElements == nil {
+		this.Logger.Debugf("No image files found")
+	} else {
+		this.Logger.Debugf("Found %d img files", imgElements.Length())
+		imgElements.Each(func(i int, s *goquery.Selection) {
+			absolutePath, err := url.JoinPath(
+				fmt.Sprintf("%s://%s", this.location.Scheme, this.location.Host),
+				s.AttrOr("src", ""),
+			)
+			// TODO deterministic file name
+			fileName := fmt.Sprintf("%s.jpg", uuid.New())
+			if err != nil {
+				this.Logger.Warnf("Could not parse img file src: %s", err)
+				return
+			}
+			downloadArg, err := NewDownloadArg(
+				absolutePath,
+				true,
+				fileName,
+				this.Logger,
+			)
+			s.SetAttr("src", fileName)
+			if err != nil {
+				this.Logger.Warnf("Could not parse img file link: %s", err)
+				return
+			}
+			imgDownloads = append(imgDownloads, downloadArg)
+		})
+	}
+	return imgDownloads
 }

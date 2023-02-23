@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"net/url"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -22,6 +23,8 @@ func GetParser(
 		return &HtmlParser{Logger: logger, Args: args}
 	case contentType == "text/css":
 		return &CssParser{}
+	case strings.HasPrefix(contentType, "image/"):
+		return &ImageParser{}
 	default:
 		return nil
 	}

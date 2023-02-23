@@ -55,11 +55,11 @@ func Start(args *args.Args, logger *zap.SugaredLogger) {
 		logger.Infof("Processed %s, returned %d new downloads", response.Url.String(), len(toProcess))
 		downloadQueue = append(downloadQueue, toProcess...)
 
-		SaveFile(filepath.Join(args.OutputDir, downloadArg.FileName), logger, result)
+		saveFile(filepath.Join(args.OutputDir, downloadArg.FileName), logger, result)
 	}
 }
 
-func SaveFile(path string, logger *zap.SugaredLogger, content *[]byte) {
+func saveFile(path string, logger *zap.SugaredLogger, content *[]byte) {
 	outputDir := filepath.Dir(path)
 	_, err := os.ReadDir(outputDir)
 	if os.IsNotExist(err) {
