@@ -110,6 +110,10 @@ func (this *HtmlParser) processImages(document *goquery.Document) []DownloadArg 
 		this.Logger.Debugf("Found %d img files", imgElements.Length())
 		imgElements.Each(func(i int, s *goquery.Selection) {
 			srcAttr := s.AttrOr("src", "")
+			if strings.HasPrefix(srcAttr, "data:") {
+				this.Logger.Debugf("Skipping inline image")
+				return
+			}
 			this.Logger.Debugf("Found img file: %s", srcAttr)
 			processed := this.handlePath(srcAttr, "img")
 			if !processed.success {
