@@ -10,7 +10,7 @@ import (
 )
 
 type Parser interface {
-	Process(content *[]byte, location url.URL) (*[]byte, []DownloadArg, error)
+	Process(content *[]byte, download DownloadArg) (*[]byte, []DownloadArg, error)
 }
 
 func GetParser(
@@ -34,6 +34,7 @@ type DownloadArg struct {
 	Url        url.URL
 	IsRequired bool
 	FileName   string
+	Depth      uint64
 }
 
 func NewDownloadArg(
@@ -41,6 +42,7 @@ func NewDownloadArg(
 	required bool,
 	fileName string,
 	logger *zap.SugaredLogger,
+	depth uint64,
 ) (DownloadArg, error) {
 	parsedUrl, err := url.Parse(link)
 	if err != nil && required {
@@ -53,5 +55,6 @@ func NewDownloadArg(
 		Url:        *parsedUrl,
 		IsRequired: required,
 		FileName:   fileName,
+		Depth:      depth,
 	}, nil
 }

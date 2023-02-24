@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/url"
 	"path/filepath"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"go.uber.org/zap"
@@ -18,10 +19,12 @@ type HtmlParser struct {
 	Args   *args.Args
 
 	location url.URL
+	depth    uint64
 }
 
-func (this *HtmlParser) Process(content *[]byte, location url.URL) (*[]byte, []DownloadArg, error) {
-	this.location = location
+func (this *HtmlParser) Process(content *[]byte, download DownloadArg) (*[]byte, []DownloadArg, error) {
+	this.location = download.Url
+	this.depth = download.Depth
 
 	document, err := goquery.NewDocumentFromReader(bytes.NewReader(*content))
 	if err != nil {
@@ -30,6 +33,7 @@ func (this *HtmlParser) Process(content *[]byte, location url.URL) (*[]byte, []D
 
 	cssDownloads := this.processCss(document)
 	imageDownloads := this.processImages(document)
+	linksDownloads := this.processLinks(document)
 
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
@@ -43,7 +47,11 @@ func (this *HtmlParser) Process(content *[]byte, location url.URL) (*[]byte, []D
 	}
 
 	result := buffer.Bytes()
-	return &result, concat([][]DownloadArg{cssDownloads, imageDownloads}), nil
+	return &result, concat([][]DownloadArg{
+		cssDownloads,
+		imageDownloads,
+		linksDownloads,
+	}), nil
 }
 
 func concat(slices [][]DownloadArg) []DownloadArg {
@@ -77,9 +85,10 @@ func (this *HtmlParser) processCss(document *goquery.Document) []DownloadArg {
 			this.Logger.Debugf("Style %s will be stored into %s", processed.url.String(), processed.localPath)
 			downloadArg, err := NewDownloadArg(
 				processed.url.String(),
-				true,
+				false,
 				processed.localPath,
 				this.Logger,
+				this.depth,
 			)
 			s.SetAttr("href", processed.localPath)
 			if err != nil {
@@ -113,6 +122,7 @@ func (this *HtmlParser) processImages(document *goquery.Document) []DownloadArg 
 				false,
 				processed.localPath,
 				this.Logger,
+				this.depth,
 			)
 			s.SetAttr("src", processed.localPath)
 			if err != nil {
@@ -123,6 +133,44 @@ func (this *HtmlParser) processImages(document *goquery.Document) []DownloadArg 
 		})
 	}
 	return imgDownloads
+}
+
+func (this *HtmlParser) processLinks(document *goquery.Document) []DownloadArg {
+	links := document.Find("a[href]")
+	linksDownloads := make([]DownloadArg, 0)
+	if links == nil {
+		this.Logger.Debugf("No links found")
+	} else {
+		this.Logger.Debugf("Found %d links", links.Length())
+		links.Each(func(i int, s *goquery.Selection) {
+			hrefAttr := s.AttrOr("href", "")
+			this.Logger.Debugf("Found link %s", hrefAttr)
+			processed := this.handlePath(hrefAttr, ".")
+			if !processed.success {
+				this.Logger.Warnf("Could not parse link href: %s", hrefAttr)
+				return
+			}
+			if !strings.HasPrefix(processed.url.String(), this.Args.RequiredPrefix) {
+				this.Logger.Debugf("Link %s does not have required prefix %s", processed.url.String(), this.Args.RequiredPrefix)
+				return
+			}
+			this.Logger.Debugf("Link %s will be stored into %s", processed.url.String(), processed.localPath)
+			downloadArg, err := NewDownloadArg(
+				processed.url.String(),
+				false,
+				processed.localPath,
+				this.Logger,
+				this.depth+1,
+			)
+			s.SetAttr("href", processed.localPath)
+			if err != nil {
+				this.Logger.Warnf("Could not parse link href: %s", err)
+				return
+			}
+			linksDownloads = append(linksDownloads, downloadArg)
+		})
+	}
+	return linksDownloads
 }
 
 type processedPath struct {
@@ -143,7 +191,13 @@ func (this *HtmlParser) handlePath(attr string, localPrefix string) processedPat
 	if fullUrl.Host == "" {
 		fullUrl.Host = this.location.Host
 	}
+	if fullUrl.Path == "/" {
+		fullUrl.Path = "/index.html"
+	}
 	fileName := filepath.Join(localPrefix, filepath.Base(fullUrl.Path))
+	if filepath.Ext(fileName) == "" {
+		fileName = fileName + ".html"
+	}
 	return processedPath{
 		success:   true,
 		url:       *fullUrl,

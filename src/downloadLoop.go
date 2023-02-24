@@ -14,16 +14,32 @@ func Start(args *args.Args, logger *zap.SugaredLogger) {
 	logger.Infof("Starting download loop for %s", args.ParseRoot)
 
 	downloadQueue := make([]parsers.DownloadArg, 0)
-	rootDownloadArg, rootDownloadError := parsers.NewDownloadArg(args.ParseRoot, true, "index.html", logger)
+	rootDownloadArg, rootDownloadError := parsers.NewDownloadArg(
+		args.ParseRoot,
+		true,
+		"index.html",
+		logger,
+		0,
+	)
 	if rootDownloadError != nil {
 		logger.Fatalf("Could not parse root url %s", args.ParseRoot)
 	}
 	downloadQueue = append(downloadQueue, rootDownloadArg)
+	prcessedSet := make(map[string]interface{})
 
 	for len(downloadQueue) > 0 {
 		downloadArg := downloadQueue[0]
 		downloadQueue = downloadQueue[1:]
 		logger.Infof("Downloading %s, remaining: %d", downloadArg.Url.String(), len(downloadQueue))
+
+		if downloadArg.Depth > args.MaxDepth {
+			logger.Debugf("Skipping %s because of depth", downloadArg.Url.String())
+			continue
+		}
+		if _, ok := prcessedSet[downloadArg.Url.String()]; ok {
+			continue
+		}
+		prcessedSet[downloadArg.Url.String()] = byte(0)
 
 		response, err := Download(downloadArg.Url, logger)
 		if err != nil {
@@ -44,7 +60,7 @@ func Start(args *args.Args, logger *zap.SugaredLogger) {
 			continue
 		}
 
-		result, toProcess, err := parser.Process(response.Content, downloadArg.Url)
+		result, toProcess, err := parser.Process(response.Content, downloadArg)
 		if err != nil {
 			logger.Warnf("Error processing %s: %s", response.ContentType, err)
 			if downloadArg.IsRequired {

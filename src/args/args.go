@@ -13,13 +13,17 @@ func printHelp() {
 }
 
 type Args struct {
-	ParseRoot string
-	OutputDir string
+	ParseRoot      string
+	OutputDir      string
+	MaxDepth       uint64
+	RequiredPrefix string
 }
 
 func ParseArgs() Args {
 	parseRoot := flag.String("parse-root", "", "Where to start parsing")
 	outputDir := flag.String("output-dir", "", "Where to store downloaded files")
+	maxDepth := flag.Uint64("max-depth", 20, "Where to store downloaded files")
+	requiredPrefix := flag.String("required-prefix", "", "Prefix that all the links must have")
 	help := flag.Bool("help", false, "Print help message")
 
 	flag.Parse()
@@ -38,9 +42,14 @@ func ParseArgs() Args {
 		printHelp()
 		os.Exit(1)
 	}
+	if *requiredPrefix == "" {
+		*requiredPrefix = *parseRoot
+	}
 
 	return Args{
-		ParseRoot: *parseRoot,
-		OutputDir: *outputDir,
+		ParseRoot:      *parseRoot,
+		OutputDir:      *outputDir,
+		MaxDepth:       *maxDepth,
+		RequiredPrefix: *requiredPrefix,
 	}
 }
