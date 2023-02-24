@@ -23,6 +23,8 @@ func GetParser(
 		return &HtmlParser{Logger: logger, Args: args}
 	case strings.Contains(contentType, "text/css"):
 		return &CssParser{}
+	case strings.Contains(contentType, "javascript"):
+		return &JavaScriptParser{}
 	case strings.HasPrefix(contentType, "image/"):
 		return &ImageParser{}
 	default:

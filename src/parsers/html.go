@@ -34,6 +34,7 @@ func (this *HtmlParser) Process(content *[]byte, download DownloadArg) (*[]byte,
 	cssDownloads := this.processCss(document)
 	imageDownloads := this.processImages(document)
 	linksDownloads := this.processLinks(document)
+	scriptsDownloads := this.processScripts(document)
 
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
@@ -51,6 +52,7 @@ func (this *HtmlParser) Process(content *[]byte, download DownloadArg) (*[]byte,
 		cssDownloads,
 		imageDownloads,
 		linksDownloads,
+		scriptsDownloads,
 	}), nil
 }
 
@@ -130,13 +132,51 @@ func (this *HtmlParser) processImages(document *goquery.Document) []DownloadArg 
 			)
 			s.SetAttr("src", processed.localPath)
 			if err != nil {
-				this.Logger.Warnf("Could not parse img file link: %s", err)
+				this.Logger.Warnf("Could not create image download link: %s", err)
 				return
 			}
 			imgDownloads = append(imgDownloads, downloadArg)
 		})
 	}
 	return imgDownloads
+}
+
+func (this *HtmlParser) processScripts(document *goquery.Document) []DownloadArg {
+	scriptsElements := document.Find("script[src]")
+	scriptDownloads := make([]DownloadArg, 0)
+	if scriptsElements == nil {
+		this.Logger.Debugf("No scripts files found")
+	} else {
+		this.Logger.Debugf("Found %d script files", scriptsElements.Length())
+		scriptsElements.Each(func(i int, s *goquery.Selection) {
+			srcAttr := s.AttrOr("src", "")
+			if srcAttr == "" {
+				this.Logger.Debugf("Skipping inline script")
+				return
+			}
+			this.Logger.Debugf("Found script file: %s", srcAttr)
+			processed := this.handlePath(srcAttr, "js")
+			if !processed.success {
+				this.Logger.Warnf("Could not parse script file link: %s", srcAttr)
+				return
+			}
+			this.Logger.Debugf("Script %s will be stored into %s", processed.url.String(), processed.localPath)
+			downloadArg, err := NewDownloadArg(
+				processed.url.String(),
+				false,
+				processed.localPath,
+				this.Logger,
+				this.depth,
+			)
+			s.SetAttr("src", processed.localPath)
+			if err != nil {
+				this.Logger.Warnf("Could not create script download link: %s", err)
+				return
+			}
+			scriptDownloads = append(scriptDownloads, downloadArg)
+		})
+	}
+	return scriptDownloads
 }
 
 func (this *HtmlParser) processLinks(document *goquery.Document) []DownloadArg {
