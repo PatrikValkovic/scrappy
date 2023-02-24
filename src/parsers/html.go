@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"net/url"
-	"path/filepath"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -217,34 +216,10 @@ func (this *HtmlParser) processLinks(document *goquery.Document) []DownloadArg {
 	return linksDownloads
 }
 
-type processedPath struct {
-	success   bool
-	url       url.URL
-	localPath string
-}
-
-func (this *HtmlParser) handlePath(attr string, localPrefix string) processedPath {
-	fullUrl, err := url.Parse(attr)
-	if err != nil {
-		this.Logger.Warnf("Could not parse css file link: %s", err)
-		return processedPath{success: false}
+func (this *HtmlParser) handlePath(attr string, localPrefix string) ProcessedPath {
+	processor := PathProcessor{
+		Logger:   this.Logger,
+		Location: this.location,
 	}
-	if fullUrl.Scheme == "" {
-		fullUrl.Scheme = this.location.Scheme
-	}
-	if fullUrl.Host == "" {
-		fullUrl.Host = this.location.Host
-	}
-	if fullUrl.Path == "/" {
-		fullUrl.Path = "/index.html"
-	}
-	fileName := filepath.Join(localPrefix, filepath.Base(fullUrl.Path))
-	if filepath.Ext(fileName) == "" {
-		fileName = fileName + ".html"
-	}
-	return processedPath{
-		success:   true,
-		url:       *fullUrl,
-		localPath: fileName,
-	}
+	return processor.HandlePath(attr, localPrefix)
 }

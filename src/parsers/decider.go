@@ -22,11 +22,13 @@ func GetParser(
 	case strings.Contains(contentType, "text/html"):
 		return &HtmlParser{Logger: logger, Args: args}
 	case strings.Contains(contentType, "text/css"):
-		return &CssParser{}
+		return &CssParser{Logger: logger}
 	case strings.Contains(contentType, "javascript"):
 		return &JavaScriptParser{}
 	case strings.HasPrefix(contentType, "image/"):
-		return &ImageParser{}
+		return &PassthroughParser{}
+	case strings.HasPrefix(contentType, "font/"):
+		return &PassthroughParser{}
 	default:
 		return nil
 	}

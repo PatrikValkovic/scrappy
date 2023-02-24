@@ -30,7 +30,6 @@ func Start(args *args.Args, logger *zap.SugaredLogger) {
 	for len(downloadQueue) > 0 {
 		downloadArg := downloadQueue[0]
 		downloadQueue = downloadQueue[1:]
-		logger.Infof("Downloading %s, remaining: %d", downloadArg.Url.String(), len(downloadQueue))
 
 		if downloadArg.Depth > args.MaxDepth {
 			logger.Debugf("Skipping %s because of depth", downloadArg.Url.String())
@@ -41,6 +40,7 @@ func Start(args *args.Args, logger *zap.SugaredLogger) {
 		}
 		prcessedSet[downloadArg.Url.String()] = byte(0)
 
+		logger.Infof("Downloading %s, remaining: %d", downloadArg.Url.String(), len(downloadQueue))
 		response, err := Download(downloadArg.Url, logger)
 		if err != nil {
 			logger.Warnf("Error downloading %s: %s", downloadArg.Url.String(), err)
