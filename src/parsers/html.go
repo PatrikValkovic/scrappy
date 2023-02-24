@@ -4,11 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"net/url"
+	"path/filepath"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/PatrikValkovic/scrappy/src/args"
@@ -68,23 +67,21 @@ func (this *HtmlParser) processCss(document *goquery.Document) []DownloadArg {
 	} else {
 		this.Logger.Debugf("Found %d css files", cssFiles.Length())
 		cssFiles.Each(func(i int, s *goquery.Selection) {
-			absolutePath, err := url.JoinPath(
-				fmt.Sprintf("%s://%s", this.location.Scheme, this.location.Host),
-				s.AttrOr("href", ""),
-			)
-			// TODO deterministic file name
-			fileName := fmt.Sprintf("%s.css", uuid.New())
-			if err != nil {
-				this.Logger.Warnf("Could not parse css file link: %s", err)
+			hrefAttr := s.AttrOr("href", "")
+			this.Logger.Debugf("Found css file: %s", hrefAttr)
+			processed := this.handlePath(hrefAttr, "styles")
+			if !processed.success {
+				this.Logger.Warnf("Could not parse css file link: %s", hrefAttr)
 				return
 			}
+			this.Logger.Debugf("Style %s will be stored into %s", processed.url.String(), processed.localPath)
 			downloadArg, err := NewDownloadArg(
-				absolutePath,
+				processed.url.String(),
 				true,
-				fileName,
+				processed.localPath,
 				this.Logger,
 			)
-			s.SetAttr("href", fileName)
+			s.SetAttr("href", processed.localPath)
 			if err != nil {
 				this.Logger.Warnf("Could not parse css file link: %s", err)
 				return
@@ -103,23 +100,21 @@ func (this *HtmlParser) processImages(document *goquery.Document) []DownloadArg 
 	} else {
 		this.Logger.Debugf("Found %d img files", imgElements.Length())
 		imgElements.Each(func(i int, s *goquery.Selection) {
-			absolutePath, err := url.JoinPath(
-				fmt.Sprintf("%s://%s", this.location.Scheme, this.location.Host),
-				s.AttrOr("src", ""),
-			)
-			// TODO deterministic file name
-			fileName := fmt.Sprintf("%s.jpg", uuid.New())
-			if err != nil {
-				this.Logger.Warnf("Could not parse img file src: %s", err)
+			srcAttr := s.AttrOr("src", "")
+			this.Logger.Debugf("Found img file: %s", srcAttr)
+			processed := this.handlePath(srcAttr, "img")
+			if !processed.success {
+				this.Logger.Warnf("Could not parse img file link: %s", srcAttr)
 				return
 			}
+			this.Logger.Debugf("Image %s will be stored into %s", processed.url.String(), processed.localPath)
 			downloadArg, err := NewDownloadArg(
-				absolutePath,
-				true,
-				fileName,
+				processed.url.String(),
+				false,
+				processed.localPath,
 				this.Logger,
 			)
-			s.SetAttr("src", fileName)
+			s.SetAttr("src", processed.localPath)
 			if err != nil {
 				this.Logger.Warnf("Could not parse img file link: %s", err)
 				return
@@ -128,4 +123,30 @@ func (this *HtmlParser) processImages(document *goquery.Document) []DownloadArg 
 		})
 	}
 	return imgDownloads
+}
+
+type processedPath struct {
+	success   bool
+	url       url.URL
+	localPath string
+}
+
+func (this *HtmlParser) handlePath(attr string, localPrefix string) processedPath {
+	fullUrl, err := url.Parse(attr)
+	if err != nil {
+		this.Logger.Warnf("Could not parse css file link: %s", err)
+		return processedPath{success: false}
+	}
+	if fullUrl.Scheme == "" {
+		fullUrl.Scheme = this.location.Scheme
+	}
+	if fullUrl.Host == "" {
+		fullUrl.Host = this.location.Host
+	}
+	fileName := filepath.Join(localPrefix, filepath.Base(fullUrl.Path))
+	return processedPath{
+		success:   true,
+		url:       *fullUrl,
+		localPath: fileName,
+	}
 }
