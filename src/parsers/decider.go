@@ -19,9 +19,9 @@ func GetParser(
 	args *args.Args,
 ) Parser {
 	switch true {
-	case contentType == "text/html":
+	case strings.Contains(contentType, "text/html"):
 		return &HtmlParser{Logger: logger, Args: args}
-	case contentType == "text/css":
+	case strings.Contains(contentType, "text/css"):
 		return &CssParser{}
 	case strings.HasPrefix(contentType, "image/"):
 		return &ImageParser{}
