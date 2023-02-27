@@ -6,15 +6,15 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/PatrikValkovic/scrappy/src/args"
-	"github.com/PatrikValkovic/scrappy/src/parsers"
+	"github.com/PatrikValkovic/scrappy/src/arg"
+	"github.com/PatrikValkovic/scrappy/src/parser"
 )
 
-func Start(args *args.Args, logger *zap.SugaredLogger) {
+func Start(args *arg.Args, logger *zap.SugaredLogger) {
 	logger.Infof("Starting download loop for %s", args.ParseRoot)
 
-	downloadQueue := make([]parsers.DownloadArg, 0)
-	rootDownloadArg, rootDownloadError := parsers.NewDownloadArg(
+	var downloadQueue []parser.DownloadArg
+	rootDownloadArg, rootDownloadError := parser.NewDownloadArg(
 		args.ParseRoot,
 		true,
 		"index.html",
@@ -51,7 +51,7 @@ func Start(args *args.Args, logger *zap.SugaredLogger) {
 		}
 
 		logger.Debugf("Downloaded %s", response.ContentType)
-		parser := parsers.GetParser(response.ContentType, logger, args)
+		parser := parser.GetParser(response.ContentType, logger, args)
 		if parser == nil {
 			logger.Warnf("No parser found for %s", response.ContentType)
 			if downloadArg.IsRequired {
@@ -60,7 +60,7 @@ func Start(args *args.Args, logger *zap.SugaredLogger) {
 			continue
 		}
 
-		result, toProcess, err := parser.Process(response.Content, downloadArg)
+		result, toProcess, err := parser.Process(*response.Content, downloadArg)
 		if err != nil {
 			logger.Warnf("Error processing %s: %s", response.ContentType, err)
 			if downloadArg.IsRequired {
@@ -75,7 +75,7 @@ func Start(args *args.Args, logger *zap.SugaredLogger) {
 	}
 }
 
-func saveFile(path string, logger *zap.SugaredLogger, content *[]byte) {
+func saveFile(path string, logger *zap.SugaredLogger, content []byte) {
 	outputDir := filepath.Dir(path)
 	_, err := os.ReadDir(outputDir)
 	if os.IsNotExist(err) {
@@ -89,7 +89,7 @@ func saveFile(path string, logger *zap.SugaredLogger, content *[]byte) {
 	if err != nil {
 		logger.Fatalf("Could not create file %s because of %v", path, err)
 	}
-	written, err := file.Write(*content)
+	written, err := file.Write(content)
 	logger.Debugf("Written %d bytes", written)
 	if err != nil {
 		logger.Fatalf("Could not write to file %s because of %v", path, err)

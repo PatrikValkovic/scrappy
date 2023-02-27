@@ -1,4 +1,4 @@
-package parsers
+package parser
 
 import (
 	"bytes"
@@ -15,9 +15,9 @@ type CssParser struct {
 	location url.URL
 }
 
-func (this *CssParser) Process(content *[]byte, arg DownloadArg) (*[]byte, []DownloadArg, error) {
+func (this *CssParser) Process(content []byte, arg DownloadArg) ([]byte, []DownloadArg, error) {
 	this.location = arg.Url
-	parser := css.NewLexer(bytes.NewReader(*content))
+	parser := css.NewLexer(bytes.NewReader(content))
 	out := bytes.NewBuffer([]byte{})
 	links := []DownloadArg{}
 
@@ -28,7 +28,7 @@ func (this *CssParser) Process(content *[]byte, arg DownloadArg) (*[]byte, []Dow
 			err := parser.Err()
 			if err == io.EOF {
 				result := out.Bytes()
-				return &result, links, nil
+				return result, links, nil
 			}
 			this.Logger.Errorf("Error parsing css: %s: %v", arg.Url.String(), parser.Err())
 			return content, []DownloadArg{}, nil

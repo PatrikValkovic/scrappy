@@ -1,4 +1,4 @@
-package args
+package arg
 
 import (
 	"flag"
@@ -8,7 +8,7 @@ import (
 
 func printHelp() {
 	fmt.Printf("Usage: %s [OPTIONS]\n", os.Args[0])
-	fmt.Println("Scrap website and download it locally\n")
+	fmt.Printf("Scrap website and download it locally\n\n")
 	flag.PrintDefaults()
 }
 

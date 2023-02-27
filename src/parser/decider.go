@@ -1,4 +1,4 @@
-package parsers
+package parser
 
 import (
 	"net/url"
@@ -6,17 +6,17 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/PatrikValkovic/scrappy/src/args"
+	"github.com/PatrikValkovic/scrappy/src/arg"
 )
 
 type Parser interface {
-	Process(content *[]byte, download DownloadArg) (*[]byte, []DownloadArg, error)
+	Process(content []byte, download DownloadArg) ([]byte, []DownloadArg, error)
 }
 
 func GetParser(
 	contentType string,
 	logger *zap.SugaredLogger,
-	args *args.Args,
+	args *arg.Args,
 ) Parser {
 	switch true {
 	case strings.Contains(contentType, "text/html"):

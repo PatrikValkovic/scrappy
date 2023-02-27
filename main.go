@@ -1,8 +1,8 @@
 package main
 
 import (
-	src "github.com/PatrikValkovic/scrappy/src"
-	args2 "github.com/PatrikValkovic/scrappy/src/args"
+	"github.com/PatrikValkovic/scrappy/src"
+	"github.com/PatrikValkovic/scrappy/src/arg"
 )
 
 func main() {
@@ -10,6 +10,6 @@ func main() {
 	src.LoadEnvironment(logger)
 	logger = src.CreateLogger()
 
-	args := args2.ParseArgs()
+	args := arg.ParseArgs()
 	src.Start(&args, logger)
 }

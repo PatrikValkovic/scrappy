@@ -1,4 +1,4 @@
-package parsers
+package parser
 
 import (
 	"bufio"
@@ -10,22 +10,22 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"go.uber.org/zap"
 
-	"github.com/PatrikValkovic/scrappy/src/args"
+	"github.com/PatrikValkovic/scrappy/src/arg"
 )
 
 type HtmlParser struct {
 	Logger *zap.SugaredLogger
-	Args   *args.Args
+	Args   *arg.Args
 
 	location url.URL
 	depth    uint64
 }
 
-func (this *HtmlParser) Process(content *[]byte, download DownloadArg) (*[]byte, []DownloadArg, error) {
+func (this *HtmlParser) Process(content []byte, download DownloadArg) ([]byte, []DownloadArg, error) {
 	this.location = download.Url
 	this.depth = download.Depth
 
-	document, err := goquery.NewDocumentFromReader(bytes.NewReader(*content))
+	document, err := goquery.NewDocumentFromReader(bytes.NewReader(content))
 	if err != nil {
 		return nil, nil, errors.New("Could not parse html")
 	}
@@ -47,7 +47,7 @@ func (this *HtmlParser) Process(content *[]byte, download DownloadArg) (*[]byte,
 	}
 
 	result := buffer.Bytes()
-	return &result, concat([][]DownloadArg{
+	return result, concat([][]DownloadArg{
 		cssDownloads,
 		imageDownloads,
 		linksDownloads,
