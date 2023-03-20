@@ -29,6 +29,9 @@ func (this *HtmlParser) Process(content []byte, download DownloadArg) ([]byte, [
 	if err != nil {
 		return nil, nil, errors.New("Could not parse html")
 	}
+	document.Find("noscript").Each(func(i int, s *goquery.Selection) {
+		s.ReplaceWithHtml(s.Text())
+	})
 
 	cssDownloads := this.processCss(document)
 	imageDownloads := this.processImages(document)
