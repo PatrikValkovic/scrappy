@@ -1,16 +1,18 @@
-package src
+package logger
 
 import (
 	"log"
-	"os"
 
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/PatrikValkovic/scrappy/internal/cliflags"
 )
 
 func CreateLogger() *zap.SugaredLogger {
 	var config zap.Config
-	if os.Getenv("ENVIRONMENT") == "development" {
+	if viper.GetString(cliflags.Environment) == "development" {
 		config = zap.NewDevelopmentConfig()
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	} else {

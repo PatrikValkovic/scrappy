@@ -1,15 +1,14 @@
 package main
 
 import (
-	"github.com/PatrikValkovic/scrappy/src"
-	"github.com/PatrikValkovic/scrappy/src/arg"
+	"os"
+
+	"github.com/PatrikValkovic/scrappy/cmd"
 )
 
 func main() {
-	logger := src.CreateLogger()
-	src.LoadEnvironment(logger)
-	logger = src.CreateLogger()
-
-	args := arg.ParseArgs()
-	src.Start(&args, logger)
+	err := cmd.RootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
 }

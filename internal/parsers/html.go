@@ -1,4 +1,4 @@
-package parser
+package parsers
 
 import (
 	"bufio"
@@ -10,12 +10,12 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"go.uber.org/zap"
 
-	"github.com/PatrikValkovic/scrappy/src/arg"
+	"github.com/PatrikValkovic/scrappy/internal/args"
 )
 
 type HtmlParser struct {
 	Logger *zap.SugaredLogger
-	Args   *arg.Args
+	Args   *args.Args
 
 	location url.URL
 	depth    uint64

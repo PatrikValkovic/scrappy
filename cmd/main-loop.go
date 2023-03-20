@@ -1,4 +1,4 @@
-package src
+package cmd
 
 import (
 	"os"
@@ -6,15 +6,16 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/PatrikValkovic/scrappy/src/arg"
-	"github.com/PatrikValkovic/scrappy/src/parser"
+	"github.com/PatrikValkovic/scrappy/internal/args"
+	"github.com/PatrikValkovic/scrappy/internal/download"
+	"github.com/PatrikValkovic/scrappy/internal/parsers"
 )
 
-func Start(args *arg.Args, logger *zap.SugaredLogger) {
+func startMainLoop(args *args.Args, logger *zap.SugaredLogger) {
 	logger.Infof("Starting download loop for %s", args.ParseRoot)
 
-	var downloadQueue []parser.DownloadArg
-	rootDownloadArg, rootDownloadError := parser.NewDownloadArg(
+	var downloadQueue []parsers.DownloadArg
+	rootDownloadArg, rootDownloadError := parsers.NewDownloadArg(
 		args.ParseRoot,
 		true,
 		"index.html",
@@ -41,7 +42,7 @@ func Start(args *arg.Args, logger *zap.SugaredLogger) {
 		prcessedSet[downloadArg.Url.String()] = byte(0)
 
 		logger.Infof("Downloading %s, remaining: %d", downloadArg.Url.String(), len(downloadQueue))
-		response, err := Download(downloadArg.Url, logger)
+		response, err := download.Download(downloadArg.Url, logger)
 		if err != nil {
 			logger.Warnf("Error downloading %s: %s", downloadArg.Url.String(), err)
 			if downloadArg.IsRequired {
@@ -51,7 +52,7 @@ func Start(args *arg.Args, logger *zap.SugaredLogger) {
 		}
 
 		logger.Debugf("Downloaded %s", response.ContentType)
-		parser := parser.GetParser(response.ContentType, logger, args)
+		parser := parsers.GetParser(response.ContentType, logger, args)
 		if parser == nil {
 			logger.Warnf("No parser found for %s", response.ContentType)
 			if downloadArg.IsRequired {
