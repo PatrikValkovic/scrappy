@@ -34,6 +34,7 @@ func (this *HtmlParser) Process(content []byte, download DownloadArg) ([]byte, [
 	imageDownloads := this.processImages(document)
 	linksDownloads := this.processLinks(document)
 	scriptsDownloads := this.processScripts(document)
+	videoDownloads := this.processVideo(document)
 
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
@@ -52,6 +53,7 @@ func (this *HtmlParser) Process(content []byte, download DownloadArg) ([]byte, [
 		imageDownloads,
 		linksDownloads,
 		scriptsDownloads,
+		videoDownloads,
 	}), nil
 }
 
@@ -214,6 +216,80 @@ func (this *HtmlParser) processLinks(document *goquery.Document) []DownloadArg {
 		})
 	}
 	return linksDownloads
+}
+
+func (this *HtmlParser) processVideo(document *goquery.Document) []DownloadArg {
+	videoDownloads := make([]DownloadArg, 0)
+
+	videoElements := document.Find("video")
+	if videoElements == nil {
+		this.Logger.Debugf("No video files found")
+	} else {
+		this.Logger.Debugf("Found %d video files", videoElements.Length())
+		videoElements.Each(func(i int, s *goquery.Selection) {
+			attr := s.AttrOr("poster", "")
+			if attr == "" {
+				this.Logger.Debugf("Skipping video without poster")
+				return
+			}
+			this.Logger.Debugf("Found video poster: %s", attr)
+			processed := this.handlePath(attr, "video")
+			if !processed.success {
+				this.Logger.Warnf("Could not parse video poster link: %s", attr)
+				return
+			}
+			this.Logger.Debugf("Video poster %s will be stored into %s", processed.url.String(), processed.localPath)
+			downloadArg, err := NewDownloadArg(
+				processed.url.String(),
+				false,
+				processed.localPath,
+				this.Logger,
+				this.depth,
+			)
+			s.SetAttr("poster", processed.localPath)
+			if err != nil {
+				this.Logger.Warnf("Could not create video poster link: %s", err)
+				return
+			}
+			videoDownloads = append(videoDownloads, downloadArg)
+		})
+	}
+
+	sourceElements := document.Find("source")
+	if sourceElements == nil {
+		this.Logger.Debugf("No video sources found")
+	} else {
+		this.Logger.Debugf("Found %d video sources", sourceElements.Length())
+		sourceElements.Each(func(i int, s *goquery.Selection) {
+			attr := s.AttrOr("src", "")
+			if attr == "" {
+				this.Logger.Debugf("Video source not found")
+				return
+			}
+			this.Logger.Debugf("Found video source: %s", attr)
+			processed := this.handlePath(attr, "video")
+			if !processed.success {
+				this.Logger.Warnf("Could not parse video source link: %s", attr)
+				return
+			}
+			this.Logger.Debugf("Video source %s will be stored into %s", processed.url.String(), processed.localPath)
+			downloadArg, err := NewDownloadArg(
+				processed.url.String(),
+				false,
+				processed.localPath,
+				this.Logger,
+				this.depth,
+			)
+			s.SetAttr("src", processed.localPath)
+			if err != nil {
+				this.Logger.Warnf("Could not create video source link: %s", err)
+				return
+			}
+			videoDownloads = append(videoDownloads, downloadArg)
+		})
+	}
+
+	return videoDownloads
 }
 
 func (this *HtmlParser) handlePath(attr string, localPrefix string) ProcessedPath {

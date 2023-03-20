@@ -29,6 +29,8 @@ func GetParser(
 		return &PassthroughParser{}
 	case strings.HasPrefix(contentType, "font/"):
 		return &PassthroughParser{}
+	case strings.HasPrefix(contentType, "video/"):
+		return &PassthroughParser{}
 	default:
 		return nil
 	}
