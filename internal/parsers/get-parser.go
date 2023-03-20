@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/PatrikValkovic/scrappy/internal/args"
+	"github.com/PatrikValkovic/scrappy/internal/config"
 )
 
 type Parser interface {
@@ -16,7 +16,7 @@ type Parser interface {
 func GetParser(
 	contentType string,
 	logger *zap.SugaredLogger,
-	args *args.Args,
+	args *config.Config,
 ) Parser {
 	switch true {
 	case strings.Contains(contentType, "text/html"):

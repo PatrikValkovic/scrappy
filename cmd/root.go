@@ -6,21 +6,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/PatrikValkovic/scrappy/internal/args"
 	"github.com/PatrikValkovic/scrappy/internal/cliflags"
+	"github.com/PatrikValkovic/scrappy/internal/config"
 	"github.com/PatrikValkovic/scrappy/internal/logger"
 )
 
 var RootCmd = &cobra.Command{
-	Use:   "scrappy",
-	Short: "Scrappy is a tool for scraping web pages",
-
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		logger := logger.CreateLogger()
-		args := args.GetArgs(cmd)
-		startMainLoop(&args, logger)
-		return nil
-	},
+	Use:           "scrappy",
+	Short:         "Scrappy is a tool for scraping web pages",
+	SilenceUsage:  true,
+	SilenceErrors: true,
 
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 		viper.AddConfigPath(".")
@@ -34,6 +29,16 @@ var RootCmd = &cobra.Command{
 		}
 		viper.AutomaticEnv()
 		return nil
+	},
+
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		logger := logger.CreateLogger()
+		args, err := config.New()
+		if err != nil {
+			logger.Infof("Error: %v", err)
+			return err
+		}
+		return startMainLoop(&args, logger)
 	},
 }
 

@@ -10,12 +10,12 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"go.uber.org/zap"
 
-	"github.com/PatrikValkovic/scrappy/internal/args"
+	"github.com/PatrikValkovic/scrappy/internal/config"
 )
 
 type HtmlParser struct {
 	Logger *zap.SugaredLogger
-	Args   *args.Args
+	Args   *config.Config
 
 	location url.URL
 	depth    uint64

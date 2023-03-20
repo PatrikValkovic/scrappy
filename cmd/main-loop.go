@@ -6,12 +6,12 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/PatrikValkovic/scrappy/internal/args"
+	"github.com/PatrikValkovic/scrappy/internal/config"
 	"github.com/PatrikValkovic/scrappy/internal/download"
 	"github.com/PatrikValkovic/scrappy/internal/parsers"
 )
 
-func startMainLoop(args *args.Args, logger *zap.SugaredLogger) {
+func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 	logger.Infof("Starting download loop for %s", args.ParseRoot)
 
 	var downloadQueue []parsers.DownloadArg
@@ -74,6 +74,8 @@ func startMainLoop(args *args.Args, logger *zap.SugaredLogger) {
 
 		saveFile(filepath.Join(args.OutputDir, downloadArg.FileName), logger, result)
 	}
+
+	return nil
 }
 
 func saveFile(path string, logger *zap.SugaredLogger, content []byte) {
