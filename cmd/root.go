@@ -19,17 +19,17 @@ var RootCmd = &cobra.Command{
 	SilenceErrors: true,
 
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		if err := viper.BindPFlags(cmd.PersistentFlags()); err != nil {
+			return err
+		}
+		viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+		viper.AutomaticEnv()
 		viper.SetEnvPrefix("SCRAPPY")
 		viper.AddConfigPath(".")
 		viper.SetConfigName("env")
 		err := viper.ReadInConfig()
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			fmt.Printf("Error reading config file %v\n", err)
-			return err
-		}
-		viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-		viper.AutomaticEnv()
-		if err := viper.BindPFlags(cmd.Flags()); err != nil {
 			return err
 		}
 		return nil
@@ -52,6 +52,6 @@ func init() {
 	RootCmd.PersistentFlags().String(cliflags.OutputDir, "./scrapes", "Where to store downloaded files")
 	RootCmd.PersistentFlags().String(cliflags.RequiredPrefix, "", "Prefix that all the links must have")
 	RootCmd.PersistentFlags().String(cliflags.Environment, "production", "Prefix that all the links must have")
-	RootCmd.PersistentFlags().Uint32(cliflags.DownloadConcurrency, 2, "Maximum number of files to download in parallel")
-	RootCmd.PersistentFlags().Uint32(cliflags.ParseConcurrency, 2, "Maximum number of files to parse in parallel")
+	RootCmd.PersistentFlags().Uint(cliflags.DownloadConcurrency, 4, "Maximum number of files to download in parallel")
+	RootCmd.PersistentFlags().Uint(cliflags.ParseConcurrency, 2, "Maximum number of files to parse in parallel")
 }
