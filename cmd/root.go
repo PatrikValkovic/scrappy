@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -18,16 +19,19 @@ var RootCmd = &cobra.Command{
 	SilenceErrors: true,
 
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		viper.SetEnvPrefix("SCRAPPY")
 		viper.AddConfigPath(".")
 		viper.SetConfigName("env")
-		if err := viper.ReadInConfig(); err != nil {
+		err := viper.ReadInConfig()
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			fmt.Printf("Error reading config file %v\n", err)
 			return err
 		}
 		viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+		viper.AutomaticEnv()
 		if err := viper.BindPFlags(cmd.Flags()); err != nil {
 			return err
 		}
-		viper.AutomaticEnv()
 		return nil
 	},
 
@@ -45,7 +49,9 @@ var RootCmd = &cobra.Command{
 func init() {
 	RootCmd.PersistentFlags().Int(cliflags.MaxDepth, 20, "Maximum depth of the crawling")
 	RootCmd.PersistentFlags().String(cliflags.ParseRoot, "", "Where to start parsing")
-	RootCmd.PersistentFlags().String(cliflags.OutputDir, "", "Where to store downloaded files")
+	RootCmd.PersistentFlags().String(cliflags.OutputDir, "./scrapes", "Where to store downloaded files")
 	RootCmd.PersistentFlags().String(cliflags.RequiredPrefix, "", "Prefix that all the links must have")
 	RootCmd.PersistentFlags().String(cliflags.Environment, "production", "Prefix that all the links must have")
+	RootCmd.PersistentFlags().Uint32(cliflags.DownloadConcurrency, 2, "Maximum number of files to download in parallel")
+	RootCmd.PersistentFlags().Uint32(cliflags.ParseConcurrency, 2, "Maximum number of files to parse in parallel")
 }

@@ -12,7 +12,7 @@ import (
 
 type DownloadResult struct {
 	Url         url.URL
-	Content     *[]byte
+	Content     []byte
 	ContentType string
 }
 
@@ -39,7 +39,7 @@ func Download(url url.URL, logger *zap.SugaredLogger) (DownloadResult, error) {
 	}
 	return DownloadResult{
 		Url:         url,
-		Content:     &body,
+		Content:     body,
 		ContentType: resp.Header.Get("Content-Type"),
 	}, nil
 }

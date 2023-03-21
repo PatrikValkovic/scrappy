@@ -43,6 +43,12 @@ type DownloadArg struct {
 	Depth      uint64
 }
 
+type ParseArg struct {
+	DownloadArg DownloadArg
+	Body        []byte
+	ContentType string
+}
+
 func NewDownloadArg(
 	link string,
 	required bool,
@@ -63,4 +69,16 @@ func NewDownloadArg(
 		FileName:   fileName,
 		Depth:      depth,
 	}, nil
+}
+
+func NewParseArg(
+	downloadArg DownloadArg,
+	body []byte,
+	contentType string,
+) ParseArg {
+	return ParseArg{
+		DownloadArg: downloadArg,
+		Body:        body,
+		ContentType: contentType,
+	}
 }

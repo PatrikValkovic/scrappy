@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/spf13/viper"
 
@@ -10,11 +11,13 @@ import (
 )
 
 type Config struct {
-	ParseRoot      string
-	OutputDir      string
-	MaxDepth       uint64
-	RequiredPrefix string
-	Environment    string
+	ParseRoot           string
+	OutputDir           string
+	MaxDepth            uint64
+	RequiredPrefix      string
+	Environment         string
+	DownloadConcurrency uint32
+	ParseConcurrency    uint32
 }
 
 func New() (Config, error) {
@@ -22,6 +25,7 @@ func New() (Config, error) {
 	outputDir := viper.GetString(cliflags.OutputDir)
 	maxDepth := viper.GetUint64(cliflags.MaxDepth)
 	requiredPrefix := viper.GetString(cliflags.RequiredPrefix)
+	fmt.Printf("Parse root: %v\n", viper.AllSettings())
 
 	if parseRoot == "" {
 		return Config{}, errors.New("Missing parse root")
@@ -37,10 +41,12 @@ func New() (Config, error) {
 	}
 
 	return Config{
-		ParseRoot:      parseRoot,
-		OutputDir:      outputDir,
-		MaxDepth:       maxDepth,
-		RequiredPrefix: requiredPrefix,
-		Environment:    viper.GetString(cliflags.Environment),
+		ParseRoot:           parseRoot,
+		OutputDir:           outputDir,
+		MaxDepth:            maxDepth,
+		RequiredPrefix:      requiredPrefix,
+		Environment:         viper.GetString(cliflags.Environment),
+		DownloadConcurrency: viper.GetUint32(cliflags.DownloadConcurrency),
+		ParseConcurrency:    viper.GetUint32(cliflags.ParseConcurrency),
 	}, nil
 }
