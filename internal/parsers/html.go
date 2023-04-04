@@ -35,9 +35,9 @@ func (this *HtmlParser) Process(content []byte, download DownloadArg) ([]byte, [
 
 	cssDownloads := this.processCss(document)
 	imageDownloads := this.processImages(document)
-	linksDownloads := this.processLinks(document)
 	scriptsDownloads := this.processScripts(document)
 	videoDownloads := this.processVideo(document)
+	linksDownloads := this.processLinks(document)
 
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
@@ -54,9 +54,9 @@ func (this *HtmlParser) Process(content []byte, download DownloadArg) ([]byte, [
 	return result, concat([][]DownloadArg{
 		cssDownloads,
 		imageDownloads,
-		linksDownloads,
 		scriptsDownloads,
 		videoDownloads,
+		linksDownloads,
 	}), nil
 }
 
@@ -211,6 +211,7 @@ func (this *HtmlParser) processLinks(document *goquery.Document) []DownloadArg {
 				this.depth+1,
 			)
 			s.SetAttr("href", processed.localPath)
+			s.RemoveAttr("integrity").RemoveAttr("crossorigin")
 			if err != nil {
 				this.Logger.Warnf("Could not parse link href: %s", err)
 				return
