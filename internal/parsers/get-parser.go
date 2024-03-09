@@ -17,12 +17,13 @@ func GetParser(
 	contentType string,
 	logger *zap.SugaredLogger,
 	args *config.Config,
+	pathProcessor *PathProcessor,
 ) Parser {
 	switch true {
 	case strings.Contains(contentType, "text/html"):
-		return &HtmlParser{Logger: logger, Args: args}
+		return &HtmlParser{Logger: logger, Args: args, PathProcessor: pathProcessor}
 	case strings.Contains(contentType, "text/css"):
-		return &CssParser{Logger: logger}
+		return &CssParser{Logger: logger, PathProcessor: pathProcessor}
 	case strings.Contains(contentType, "javascript"):
 		return &JavaScriptParser{}
 	case strings.HasPrefix(contentType, "image/"):

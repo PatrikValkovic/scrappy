@@ -11,8 +11,9 @@ import (
 )
 
 type CssParser struct {
-	Logger   *zap.SugaredLogger
-	location url.URL
+	Logger        *zap.SugaredLogger
+	location      url.URL
+	PathProcessor *PathProcessor
 }
 
 func (this *CssParser) Process(content []byte, arg DownloadArg) ([]byte, []DownloadArg, error) {
@@ -36,29 +37,21 @@ func (this *CssParser) Process(content []byte, arg DownloadArg) ([]byte, []Downl
 			s := string(b)
 			link := s[4 : len(s)-1]
 			this.Logger.Debugf("Found link in styles: %s", link)
-			p := this.handlePath(link, "in-css")
-			if !p.success {
+			p := this.PathProcessor.HandlePath(link, this.location, "in-css")
+			if !p.Success {
 				this.Logger.Warnf("Could not parse css link: %s", link)
 				out.Write(b)
 				continue
 			}
-			this.Logger.Debugf("Parsed css link %s saved into %s", p.url.String(), p.localPath)
-			out.WriteString(fmt.Sprintf("url(\"../%s\")", p.localPath))
+			this.Logger.Debugf("Parsed css link %s saved into %s", p.Url.String(), p.LocalPath)
+			out.WriteString(fmt.Sprintf("url(\"../%s\")", p.LocalPath))
 			links = append(links, DownloadArg{
-				Url:      p.url,
+				Url:      p.Url,
 				Depth:    arg.Depth + 1,
-				FileName: p.localPath,
+				FileName: p.LocalPath,
 			})
 		default:
 			out.Write(b)
 		}
 	}
-}
-
-func (this *CssParser) handlePath(attr string, localPrefix string) ProcessedPath {
-	processor := PathProcessor{
-		Logger:   this.Logger,
-		Location: this.location,
-	}
-	return processor.HandlePath(attr, localPrefix)
 }

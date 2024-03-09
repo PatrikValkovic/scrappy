@@ -14,8 +14,9 @@ import (
 )
 
 type HtmlParser struct {
-	Logger *zap.SugaredLogger
-	Args   *config.Config
+	Logger        *zap.SugaredLogger
+	Args          *config.Config
+	PathProcessor *PathProcessor
 
 	location url.URL
 	depth    uint64
@@ -83,20 +84,20 @@ func (this *HtmlParser) processCss(document *goquery.Document) []DownloadArg {
 		cssFiles.Each(func(i int, s *goquery.Selection) {
 			hrefAttr := s.AttrOr("href", "")
 			this.Logger.Debugf("Found css file: %s", hrefAttr)
-			processed := this.handlePath(hrefAttr, "styles")
-			if !processed.success {
+			processed := this.PathProcessor.HandlePath(hrefAttr, this.location, "styles")
+			if !processed.Success {
 				this.Logger.Warnf("Could not parse css file link: %s", hrefAttr)
 				return
 			}
-			this.Logger.Debugf("Style %s will be stored into %s", processed.url.String(), processed.localPath)
+			this.Logger.Debugf("Style %s will be stored into %s", processed.Url.String(), processed.LocalPath)
 			downloadArg, err := NewDownloadArg(
-				processed.url.String(),
+				processed.Url.String(),
 				false,
-				processed.localPath,
+				processed.LocalPath,
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("href", processed.localPath)
+			s.SetAttr("href", processed.LocalPath)
 			if err != nil {
 				this.Logger.Warnf("Could not parse css file link: %s", err)
 				return
@@ -121,20 +122,20 @@ func (this *HtmlParser) processImages(document *goquery.Document) []DownloadArg 
 				return
 			}
 			this.Logger.Debugf("Found img file: %s", srcAttr)
-			processed := this.handlePath(srcAttr, "img")
-			if !processed.success {
+			processed := this.PathProcessor.HandlePath(srcAttr, this.location, "img")
+			if !processed.Success {
 				this.Logger.Warnf("Could not parse img file link: %s", srcAttr)
 				return
 			}
-			this.Logger.Debugf("Image %s will be stored into %s", processed.url.String(), processed.localPath)
+			this.Logger.Debugf("Image %s will be stored into %s", processed.Url.String(), processed.LocalPath)
 			downloadArg, err := NewDownloadArg(
-				processed.url.String(),
+				processed.Url.String(),
 				false,
-				processed.localPath,
+				processed.LocalPath,
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("src", processed.localPath)
+			s.SetAttr("src", processed.LocalPath)
 			if err != nil {
 				this.Logger.Warnf("Could not create image download link: %s", err)
 				return
@@ -159,20 +160,20 @@ func (this *HtmlParser) processScripts(document *goquery.Document) []DownloadArg
 				return
 			}
 			this.Logger.Debugf("Found script file: %s", srcAttr)
-			processed := this.handlePath(srcAttr, "js")
-			if !processed.success {
+			processed := this.PathProcessor.HandlePath(srcAttr, this.location, "js")
+			if !processed.Success {
 				this.Logger.Warnf("Could not parse script file link: %s", srcAttr)
 				return
 			}
-			this.Logger.Debugf("Script %s will be stored into %s", processed.url.String(), processed.localPath)
+			this.Logger.Debugf("Script %s will be stored into %s", processed.Url.String(), processed.LocalPath)
 			downloadArg, err := NewDownloadArg(
-				processed.url.String(),
+				processed.Url.String(),
 				false,
-				processed.localPath,
+				processed.LocalPath,
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("src", processed.localPath)
+			s.SetAttr("src", processed.LocalPath)
 			if err != nil {
 				this.Logger.Warnf("Could not create script download link: %s", err)
 				return
@@ -185,32 +186,36 @@ func (this *HtmlParser) processScripts(document *goquery.Document) []DownloadArg
 
 func (this *HtmlParser) processLinks(document *goquery.Document) []DownloadArg {
 	links := document.Find("a[href]")
-	linksDownloads := make([]DownloadArg, 0)
+	linksDownloads := make([]DownloadArg, 0, links.Length())
 	if links == nil {
 		this.Logger.Debugf("No links found")
 	} else {
 		this.Logger.Debugf("Found %d links", links.Length())
 		links.Each(func(i int, s *goquery.Selection) {
 			hrefAttr := s.AttrOr("href", "")
+			if strings.HasPrefix(hrefAttr, "#") {
+				this.Logger.Debugf("Skipping anchor link to local site")
+				return
+			}
 			this.Logger.Debugf("Found link %s", hrefAttr)
-			processed := this.handlePath(hrefAttr, ".")
-			if !processed.success {
+			processed := this.PathProcessor.HandlePath(hrefAttr, this.location, ".")
+			if !processed.Success {
 				this.Logger.Warnf("Could not parse link href: %s", hrefAttr)
 				return
 			}
-			if !strings.HasPrefix(processed.url.String(), this.Args.RequiredPrefix) {
-				this.Logger.Debugf("Link %s does not have required prefix %s", processed.url.String(), this.Args.RequiredPrefix)
+			if !strings.HasPrefix(processed.Url.String(), this.Args.RequiredPrefix) {
+				this.Logger.Debugf("Link %s does not have required prefix %s", processed.Url.String(), this.Args.RequiredPrefix)
 				return
 			}
-			this.Logger.Debugf("Link %s will be stored into %s", processed.url.String(), processed.localPath)
+			this.Logger.Debugf("Link %s will be stored into %s", processed.Url.String(), processed.LocalPath)
 			downloadArg, err := NewDownloadArg(
-				processed.url.String(),
+				processed.Url.String(),
 				false,
-				processed.localPath,
+				processed.LocalPath,
 				this.Logger,
 				this.depth+1,
 			)
-			s.SetAttr("href", processed.localPath)
+			s.SetAttr("href", processed.LocalPath)
 			s.RemoveAttr("integrity").RemoveAttr("crossorigin")
 			if err != nil {
 				this.Logger.Warnf("Could not parse link href: %s", err)
@@ -237,20 +242,20 @@ func (this *HtmlParser) processVideo(document *goquery.Document) []DownloadArg {
 				return
 			}
 			this.Logger.Debugf("Found video poster: %s", attr)
-			processed := this.handlePath(attr, "video")
-			if !processed.success {
+			processed := this.PathProcessor.HandlePath(attr, this.location, "video")
+			if !processed.Success {
 				this.Logger.Warnf("Could not parse video poster link: %s", attr)
 				return
 			}
-			this.Logger.Debugf("Video poster %s will be stored into %s", processed.url.String(), processed.localPath)
+			this.Logger.Debugf("Video poster %s will be stored into %s", processed.Url.String(), processed.LocalPath)
 			downloadArg, err := NewDownloadArg(
-				processed.url.String(),
+				processed.Url.String(),
 				false,
-				processed.localPath,
+				processed.LocalPath,
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("poster", processed.localPath)
+			s.SetAttr("poster", processed.LocalPath)
 			if err != nil {
 				this.Logger.Warnf("Could not create video poster link: %s", err)
 				return
@@ -271,20 +276,20 @@ func (this *HtmlParser) processVideo(document *goquery.Document) []DownloadArg {
 				return
 			}
 			this.Logger.Debugf("Found video source: %s", attr)
-			processed := this.handlePath(attr, "video")
-			if !processed.success {
+			processed := this.PathProcessor.HandlePath(attr, this.location, "video")
+			if !processed.Success {
 				this.Logger.Warnf("Could not parse video source link: %s", attr)
 				return
 			}
-			this.Logger.Debugf("Video source %s will be stored into %s", processed.url.String(), processed.localPath)
+			this.Logger.Debugf("Video source %s will be stored into %s", processed.Url.String(), processed.LocalPath)
 			downloadArg, err := NewDownloadArg(
-				processed.url.String(),
+				processed.Url.String(),
 				false,
-				processed.localPath,
+				processed.LocalPath,
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("src", processed.localPath)
+			s.SetAttr("src", processed.LocalPath)
 			if err != nil {
 				this.Logger.Warnf("Could not create video source link: %s", err)
 				return
@@ -294,12 +299,4 @@ func (this *HtmlParser) processVideo(document *goquery.Document) []DownloadArg {
 	}
 
 	return videoDownloads
-}
-
-func (this *HtmlParser) handlePath(attr string, localPrefix string) ProcessedPath {
-	processor := PathProcessor{
-		Logger:   this.Logger,
-		Location: this.location,
-	}
-	return processor.HandlePath(attr, localPrefix)
 }

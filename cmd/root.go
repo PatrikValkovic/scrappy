@@ -28,7 +28,7 @@ var RootCmd = &cobra.Command{
 		viper.AddConfigPath(".")
 		viper.SetConfigName("env")
 		err := viper.ReadInConfig()
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			fmt.Printf("Error reading config file %v\n", err)
 			return err
 		}

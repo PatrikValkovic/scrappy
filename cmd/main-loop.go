@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -27,31 +28,43 @@ func Contains[T comparable](s []T, e T) bool {
 }
 
 func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
+	var err error
 	logger.Infof("Starting download loop for %s", args.ParseRoot)
 
 	downloadCoordChannel := make(chan uint32)
 	parserCoordChannel := make(chan uint32)
-	downloadQueue := queue.NewLinked([]*parsers.DownloadArg{})
+	downloadQueue := queue.NewLinked([]parsers.DownloadArg{})
 	parseQueue := queue.NewBlocking([]*parsers.ParseArg{}, queue.WithCapacity(4*int(args.ParseConcurrency)))
 	interruptCtx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	endCtx, endProgram := context.WithCancel(context.Background())
+	prefixUrl, err := url.Parse(args.RequiredPrefix)
+	if err != nil {
+		logger.Fatalf("Could not parse prefix url %s", args.ParseRoot)
+	}
+	pathProcessor := parsers.NewPathProcessor(logger, prefixUrl)
 
+	processedMutex := sync.Mutex{}
+	prcessedSet := make(map[string]interface{})
+
+	// Root download
+	processedRoot := pathProcessor.HandlePath(args.ParseRoot, *prefixUrl, ".")
+	if !processedRoot.Success {
+		logger.Fatalf("Could not parse root url %s", args.ParseRoot)
+	}
 	rootDownloadArg, rootDownloadError := parsers.NewDownloadArg(
 		args.ParseRoot,
 		true,
-		"index.html",
+		processedRoot.LocalPath,
 		logger,
 		0,
 	)
 	if rootDownloadError != nil {
 		logger.Fatalf("Could not parse root url %s", args.ParseRoot)
 	}
-	err := downloadQueue.Offer(&rootDownloadArg)
+	err = downloadQueue.Offer(rootDownloadArg)
 	if err != nil {
 		logger.Fatalf("Could not insert root url %s into queue", args.ParseRoot)
 	}
-	processedMutex := sync.Mutex{}
-	prcessedSet := make(map[string]interface{})
 
 	// Coordinator
 	go func() {
@@ -102,7 +115,7 @@ func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 		go func(identifier uint32) {
 			defer downloadPool.Done()
 			for true {
-				var downloadArg *parsers.DownloadArg
+				var downloadArg parsers.DownloadArg
 				select {
 				case <-endCtx.Done():
 					return
@@ -146,7 +159,7 @@ func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 				}
 				logger.Debugf("Downloaded %s", response.ContentType)
 
-				parseArg := parsers.NewParseArg(*downloadArg, response.Content, response.ContentType)
+				parseArg := parsers.NewParseArg(downloadArg, response.Content, response.ContentType)
 				parseQueue.OfferWait(&parseArg)
 			}
 			logger.Infoln("Download finished")
@@ -180,7 +193,7 @@ func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 						continue
 					}
 				}
-				parser := parsers.GetParser(toParse.ContentType, logger, args)
+				parser := parsers.GetParser(toParse.ContentType, logger, args, pathProcessor)
 				if parser == nil {
 					logger.Warnf("No parser found for %s", toParse.ContentType)
 					if toParse.DownloadArg.IsRequired {
@@ -200,7 +213,8 @@ func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 				logger.Infof("Processed %s, returned %d new downloads", toParse.DownloadArg.Url.String(), len(toProcess))
 				saveFile(filepath.Join(args.OutputDir, toParse.DownloadArg.FileName), logger, result)
 				for _, downloadArg := range toProcess {
-					err := downloadQueue.Offer(&downloadArg)
+					tmp := downloadArg
+					err := downloadQueue.Offer(tmp)
 					if err != nil {
 						logger.Warnf("Error inserting download into queue: %s", err)
 					}
