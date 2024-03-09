@@ -49,13 +49,15 @@ func (this *PathProcessor) HandlePath(
 		return ProcessedPath{Success: false}
 	}
 	resolved := onSite.ResolveReference(fullUrl)
+	resolvedWithoutFragment := *resolved
+	resolvedWithoutFragment.Fragment = ""
 
-	if existingPath := this.urlToFile[resolved.String()]; existingPath != "" {
+	if existingPath := this.urlToFile[resolvedWithoutFragment.String()]; existingPath != "" {
 		return ProcessedPath{
 			Success:     true,
 			Url:         *resolved,
 			LocalPath:   existingPath,
-			RelativeUrl: existingPath,
+			RelativeUrl: existingPath + resolved.Fragment,
 		}
 	}
 
@@ -90,13 +92,18 @@ func (this *PathProcessor) HandlePath(
 		)
 	}
 
-	this.fileToUrl[fileName] = resolved.String()
-	this.urlToFile[resolved.String()] = fileName
+	this.fileToUrl[fileName] = resolvedWithoutFragment.String()
+	this.urlToFile[resolvedWithoutFragment.String()] = fileName
+
+	relativeUrl := fileName
+	if resolved.Fragment != "" {
+		relativeUrl = fileName + "#" + resolved.Fragment
+	}
 
 	return ProcessedPath{
 		Success:     true,
 		Url:         *resolved,
 		LocalPath:   fileName,
-		RelativeUrl: fileName,
+		RelativeUrl: relativeUrl,
 	}
 }

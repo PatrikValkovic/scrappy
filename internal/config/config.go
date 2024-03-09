@@ -3,8 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
-
 	"github.com/spf13/viper"
+	"regexp"
 
 	"github.com/PatrikValkovic/scrappy/internal/cliflags"
 	"github.com/PatrikValkovic/scrappy/internal/environment"
@@ -18,6 +18,7 @@ type Config struct {
 	Environment         string
 	DownloadConcurrency uint32
 	ParseConcurrency    uint32
+	IgnorePatterns      []*regexp.Regexp
 }
 
 func New() (Config, error) {
@@ -40,6 +41,16 @@ func New() (Config, error) {
 		requiredPrefix = parseRoot
 	}
 
+	ignorePatterns := viper.GetStringSlice(cliflags.IgnorePattern)
+	ignoreRegexes := make([]*regexp.Regexp, 0, len(ignorePatterns))
+	for _, pattern := range ignorePatterns {
+		regex, err := regexp.Compile(pattern)
+		if err != nil {
+			return Config{}, fmt.Errorf("Invalid ignore pattern %s: %v", pattern, err)
+		}
+		ignoreRegexes = append(ignoreRegexes, regex)
+	}
+
 	return Config{
 		ParseRoot:           parseRoot,
 		OutputDir:           outputDir,
@@ -48,5 +59,6 @@ func New() (Config, error) {
 		Environment:         viper.GetString(cliflags.Environment),
 		DownloadConcurrency: viper.GetUint32(cliflags.DownloadConcurrency),
 		ParseConcurrency:    viper.GetUint32(cliflags.ParseConcurrency),
+		IgnorePatterns:      ignoreRegexes,
 	}, nil
 }

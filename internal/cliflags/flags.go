@@ -8,4 +8,5 @@ const (
 	Environment         = "environment"
 	DownloadConcurrency = "download-concurrency"
 	ParseConcurrency    = "parse-concurrency"
+	IgnorePattern       = "ignore-pattern"
 )

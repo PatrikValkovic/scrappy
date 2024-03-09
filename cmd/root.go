@@ -54,4 +54,5 @@ func init() {
 	RootCmd.PersistentFlags().String(cliflags.Environment, "production", "Prefix that all the links must have")
 	RootCmd.PersistentFlags().Uint(cliflags.DownloadConcurrency, 4, "Maximum number of files to download in parallel")
 	RootCmd.PersistentFlags().Uint(cliflags.ParseConcurrency, 2, "Maximum number of files to parse in parallel")
+	RootCmd.PersistentFlags().StringArray(cliflags.IgnorePattern, []string{}, "Pattern to ignore, may be specified multiple times")
 }

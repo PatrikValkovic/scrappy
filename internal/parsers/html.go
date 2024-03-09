@@ -207,6 +207,12 @@ func (this *HtmlParser) processLinks(document *goquery.Document) []DownloadArg {
 				this.Logger.Debugf("Link %s does not have required prefix %s", processed.Url.String(), this.Args.RequiredPrefix)
 				return
 			}
+			for _, pattern := range this.Args.IgnorePatterns {
+				if pattern.MatchString(processed.Url.String()) {
+					this.Logger.Debugf("Link %s matches ignore pattern %s", processed.Url.String(), pattern.String())
+					return
+				}
+			}
 			this.Logger.Debugf("Link %s will be stored into %s", processed.Url.String(), processed.LocalPath)
 			downloadArg, err := NewDownloadArg(
 				processed.Url.String(),
