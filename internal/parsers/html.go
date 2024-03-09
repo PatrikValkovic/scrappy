@@ -97,7 +97,7 @@ func (this *HtmlParser) processCss(document *goquery.Document) []DownloadArg {
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("href", processed.LocalPath)
+			s.SetAttr("href", processed.RelativeUrl)
 			if err != nil {
 				this.Logger.Warnf("Could not parse css file link: %s", err)
 				return
@@ -135,7 +135,7 @@ func (this *HtmlParser) processImages(document *goquery.Document) []DownloadArg 
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("src", processed.LocalPath)
+			s.SetAttr("src", processed.RelativeUrl)
 			if err != nil {
 				this.Logger.Warnf("Could not create image download link: %s", err)
 				return
@@ -173,7 +173,7 @@ func (this *HtmlParser) processScripts(document *goquery.Document) []DownloadArg
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("src", processed.LocalPath)
+			s.SetAttr("src", processed.RelativeUrl)
 			if err != nil {
 				this.Logger.Warnf("Could not create script download link: %s", err)
 				return
@@ -215,7 +215,7 @@ func (this *HtmlParser) processLinks(document *goquery.Document) []DownloadArg {
 				this.Logger,
 				this.depth+1,
 			)
-			s.SetAttr("href", processed.LocalPath)
+			s.SetAttr("href", processed.RelativeUrl)
 			s.RemoveAttr("integrity").RemoveAttr("crossorigin")
 			if err != nil {
 				this.Logger.Warnf("Could not parse link href: %s", err)
@@ -255,7 +255,7 @@ func (this *HtmlParser) processVideo(document *goquery.Document) []DownloadArg {
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("poster", processed.LocalPath)
+			s.SetAttr("poster", processed.RelativeUrl)
 			if err != nil {
 				this.Logger.Warnf("Could not create video poster link: %s", err)
 				return
@@ -289,7 +289,7 @@ func (this *HtmlParser) processVideo(document *goquery.Document) []DownloadArg {
 				this.Logger,
 				this.depth,
 			)
-			s.SetAttr("src", processed.LocalPath)
+			s.SetAttr("src", processed.RelativeUrl)
 			if err != nil {
 				this.Logger.Warnf("Could not create video source link: %s", err)
 				return

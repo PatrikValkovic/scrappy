@@ -11,9 +11,10 @@ import (
 )
 
 type ProcessedPath struct {
-	Success   bool
-	Url       url.URL
-	LocalPath string
+	Success     bool
+	Url         url.URL
+	LocalPath   string
+	RelativeUrl string
 }
 
 type PathProcessor struct {
@@ -51,40 +52,51 @@ func (this *PathProcessor) HandlePath(
 
 	if existingPath := this.urlToFile[resolved.String()]; existingPath != "" {
 		return ProcessedPath{
-			Success:   true,
-			Url:       *resolved,
-			LocalPath: existingPath,
+			Success:     true,
+			Url:         *resolved,
+			LocalPath:   existingPath,
+			RelativeUrl: existingPath,
 		}
 	}
 
-	clonedUrl := *resolved
-	if strings.HasPrefix(clonedUrl.Path, this.Location.Path) {
-		clonedUrl.Path = clonedUrl.Path[len(this.Location.Path):]
+	relativeFileName := resolved.Path
+	if strings.HasPrefix(relativeFileName, this.Location.Path) {
+		relativeFileName = relativeFileName[len(this.Location.Path):]
 	}
-	if clonedUrl.Path == "/" || clonedUrl.Path == "" {
-		clonedUrl.Path = "/index.html"
+	if strings.HasSuffix(relativeFileName, "/index.html") {
+		relativeFileName = relativeFileName[:len(relativeFileName)-len("index.html")]
 	}
-	fileName := filepath.Join(localPrefix, clonedUrl.Path)
-	if strings.HasSuffix(fileName, "/") {
-		fileName = fileName[:len(fileName)-1]
+	if strings.HasSuffix(relativeFileName, "/") {
+		relativeFileName = relativeFileName[:len(relativeFileName)-1]
 	}
-	if filepath.Ext(fileName) == "" {
-		fileName = fileName + ".html"
+	if directory := filepath.Dir(relativeFileName); directory != "." {
+		relativeFileName = relativeFileName[len(directory):]
+	}
+	if relativeFileName == "/" || relativeFileName == "" {
+		relativeFileName = "index.html"
+	}
+	if filepath.Ext(relativeFileName) == "" {
+		relativeFileName = relativeFileName + ".html"
 	}
 
+	fileName := filepath.Join(localPrefix, relativeFileName)
 	counter := 0
 	for _, ok := this.fileToUrl[fileName]; ok; _, ok = this.fileToUrl[fileName] {
 		counter++
 		extension := filepath.Ext(fileName)
-		fileName = fmt.Sprintf("%s_%d%s", fileName[:len(fileName)-len(extension)], counter, extension)
+		fileName = filepath.Join(
+			localPrefix,
+			fmt.Sprintf("%s_%d%s", relativeFileName[:len(relativeFileName)-len(extension)], counter, extension),
+		)
 	}
 
 	this.fileToUrl[fileName] = resolved.String()
 	this.urlToFile[resolved.String()] = fileName
 
 	return ProcessedPath{
-		Success:   true,
-		Url:       *resolved,
-		LocalPath: fileName,
+		Success:     true,
+		Url:         *resolved,
+		LocalPath:   fileName,
+		RelativeUrl: fileName,
 	}
 }

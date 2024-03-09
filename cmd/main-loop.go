@@ -73,7 +73,7 @@ func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 		for len(exitingParsers) < int(args.ParseConcurrency) ||
 			len(exitingDownloaders) < int(args.DownloadConcurrency) ||
 			!downloadQueue.IsEmpty() ||
-			!parseQueue.IsEmpty() {
+			!parseQueue.IsEmpty() || true {
 
 			select {
 			case <-time.After(100 * time.Millisecond):

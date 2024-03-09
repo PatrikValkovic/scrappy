@@ -44,7 +44,7 @@ func (this *CssParser) Process(content []byte, arg DownloadArg) ([]byte, []Downl
 				continue
 			}
 			this.Logger.Debugf("Parsed css link %s saved into %s", p.Url.String(), p.LocalPath)
-			out.WriteString(fmt.Sprintf("url(\"../%s\")", p.LocalPath))
+			out.WriteString(fmt.Sprintf("url(\"../%s\")", p.RelativeUrl))
 			links = append(links, DownloadArg{
 				Url:      p.Url,
 				Depth:    arg.Depth + 1,
