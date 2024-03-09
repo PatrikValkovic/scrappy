@@ -4,10 +4,11 @@ go 1.20
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
+	github.com/adrianbrad/queue v1.3.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
 	github.com/tdewolff/parse v2.3.4+incompatible
-	go.uber.org/zap v1.24.0
+	go.uber.org/zap v1.27.0
 )
 
 require (
@@ -25,7 +26,7 @@ require (
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/tdewolff/test v1.0.7 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect

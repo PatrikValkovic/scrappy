@@ -3,10 +3,13 @@ package cmd
 import (
 	"context"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
+	"syscall"
+	"time"
 
+	"github.com/adrianbrad/queue"
 	"go.uber.org/zap"
 
 	"github.com/PatrikValkovic/scrappy/internal/config"
@@ -14,13 +17,25 @@ import (
 	"github.com/PatrikValkovic/scrappy/internal/parsers"
 )
 
+func Contains[T comparable](s []T, e T) bool {
+	for _, v := range s {
+		if v == e {
+			return true
+		}
+	}
+	return false
+}
+
 func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 	logger.Infof("Starting download loop for %s", args.ParseRoot)
 
-	downloadCounter := atomic.Int32{}
-	parsingCounter := atomic.Int32{}
-	downloadQueue := make(chan *parsers.DownloadArg, args.DownloadConcurrency)
-	parseQueue := make(chan *parsers.ParseArg, args.ParseConcurrency)
+	downloadCoordChannel := make(chan uint32)
+	parserCoordChannel := make(chan uint32)
+	downloadQueue := queue.NewLinked([]*parsers.DownloadArg{})
+	parseQueue := queue.NewBlocking([]*parsers.ParseArg{}, queue.WithCapacity(4*int(args.ParseConcurrency)))
+	interruptCtx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	endCtx, endProgram := context.WithCancel(context.Background())
+
 	rootDownloadArg, rootDownloadError := parsers.NewDownloadArg(
 		args.ParseRoot,
 		true,
@@ -31,78 +46,142 @@ func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 	if rootDownloadError != nil {
 		logger.Fatalf("Could not parse root url %s", args.ParseRoot)
 	}
-	downloadCounter.Add(1)
-	downloadQueue <- &rootDownloadArg
+	err := downloadQueue.Offer(&rootDownloadArg)
+	if err != nil {
+		logger.Fatalf("Could not insert root url %s into queue", args.ParseRoot)
+	}
 	processedMutex := sync.Mutex{}
 	prcessedSet := make(map[string]interface{})
 
+	// Coordinator
+	go func() {
+		exitingDownloaders := []uint32{}
+		exitingParsers := []uint32{}
+		for len(exitingParsers) < int(args.ParseConcurrency) ||
+			len(exitingDownloaders) < int(args.DownloadConcurrency) ||
+			!downloadQueue.IsEmpty() ||
+			!parseQueue.IsEmpty() {
+
+			select {
+			case <-time.After(100 * time.Millisecond):
+				if !downloadQueue.IsEmpty() || !parseQueue.IsEmpty() {
+					exitingDownloaders = exitingDownloaders[:0]
+					exitingParsers = exitingParsers[:0]
+				}
+				continue
+			case <-interruptCtx.Done():
+				logger.Debugln("Coordinator interrupted")
+				return
+			case downloderIdentifier := <-downloadCoordChannel:
+				if !downloadQueue.IsEmpty() || !parseQueue.IsEmpty() {
+					continue
+				}
+				if Contains(exitingDownloaders, downloderIdentifier) {
+					continue
+				}
+				exitingDownloaders = append(exitingDownloaders, downloderIdentifier)
+			case paserIdentifier := <-parserCoordChannel:
+				if !downloadQueue.IsEmpty() || !parseQueue.IsEmpty() {
+					continue
+				}
+				if Contains(exitingParsers, paserIdentifier) {
+					continue
+				}
+				exitingParsers = append(exitingParsers, paserIdentifier)
+			}
+		}
+
+		logger.Infoln("All downloaders and parsers finished")
+		endProgram()
+	}()
+
 	// Downloads
 	downloadPool := sync.WaitGroup{}
-	ctx, ctxCancel := context.WithCancel(context.Background())
 	for i := uint32(0); i < args.DownloadConcurrency; i++ {
 		downloadPool.Add(1)
-		go func() {
+		go func(identifier uint32) {
 			defer downloadPool.Done()
-			for downloadCounter.Load() > 0 || parsingCounter.Load() > 0 {
+			for true {
 				var downloadArg *parsers.DownloadArg
 				select {
-				case <-ctx.Done():
-					continue
-				case downloadArg = <-downloadQueue:
+				case <-endCtx.Done():
+					return
+				case <-interruptCtx.Done():
+					logger.Debugln("Downloader interrupted")
+					return
+				default:
+					if downloadQueue.IsEmpty() {
+						downloadCoordChannel <- identifier
+						time.Sleep(100 * time.Millisecond)
+						continue
+					}
+					downloadArg, err = downloadQueue.Get()
+					if err != nil {
+						logger.Warnf("Error getting download from queue: %s", err)
+						continue
+					}
 				}
+
 				if downloadArg.Depth > args.MaxDepth {
 					logger.Debugf("Skipping %s because of depth", downloadArg.Url.String())
-					downloadCounter.Add(-1)
 					continue
 				}
 				processedMutex.Lock()
 				if _, ok := prcessedSet[downloadArg.Url.String()]; ok {
 					processedMutex.Unlock()
 					logger.Debugf("Skipping %s because of already processed", downloadArg.Url.String())
-					downloadCounter.Add(-1)
 					continue
 				}
 				prcessedSet[downloadArg.Url.String()] = 1
 				processedMutex.Unlock()
 
-				logger.Infof("Downloading %s, remaining: %d", downloadArg.Url.String(), downloadCounter.Load())
+				logger.Infof("Downloading %s, remaining: %d", downloadArg.Url.String(), downloadQueue.Size())
 				response, err := download.Download(downloadArg.Url, logger)
 				if err != nil {
 					logger.Warnf("Error downloading %s: %s", downloadArg.Url.String(), err)
 					if downloadArg.IsRequired {
 						logger.Fatalf("IsRequired download failed")
 					}
-					downloadCounter.Add(-1)
 					continue
 				}
 				logger.Debugf("Downloaded %s", response.ContentType)
 
 				parseArg := parsers.NewParseArg(*downloadArg, response.Content, response.ContentType)
-				parsingCounter.Add(1)
-				parseQueue <- &parseArg
-				downloadCounter.Add(-1)
+				parseQueue.OfferWait(&parseArg)
 			}
 			logger.Infoln("Download finished")
-			ctxCancel()
-		}()
+			endProgram()
+		}(i)
 	}
 
 	// Parsers
 	parsePool := sync.WaitGroup{}
 	for i := uint32(0); i < args.ParseConcurrency; i++ {
 		parsePool.Add(1)
-		go func() {
+		go func(identifier uint32) {
 			defer parsePool.Done()
-			for downloadCounter.Load() > 0 || parsingCounter.Load() > 0 {
+			for true {
 				var toParse *parsers.ParseArg
 				select {
-				case <-ctx.Done():
-					continue
-				case toParse = <-parseQueue:
+				case <-endCtx.Done():
+					return
+				case <-interruptCtx.Done():
+					logger.Debugln("Parser interrupted")
+					return
+				default:
+					if parseQueue.IsEmpty() {
+						parserCoordChannel <- identifier
+						time.Sleep(100 * time.Millisecond)
+						continue
+					}
+					toParse, err = parseQueue.Get()
+					if err != nil {
+						logger.Warnf("Error getting parse from queue: %s", err)
+						continue
+					}
 				}
 				parser := parsers.GetParser(toParse.ContentType, logger, args)
 				if parser == nil {
-					parsingCounter.Add(-1)
 					logger.Warnf("No parser found for %s", toParse.ContentType)
 					if toParse.DownloadArg.IsRequired {
 						logger.Fatalf("IsRequired download is missing type parser")
@@ -112,7 +191,6 @@ func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 
 				result, toProcess, err := parser.Process(toParse.Body, toParse.DownloadArg)
 				if err != nil {
-					parsingCounter.Add(-1)
 					logger.Warnf("Error processing %s: %s", toParse.ContentType, err)
 					if toParse.DownloadArg.IsRequired {
 						logger.Fatalf("IsRequired download failed to process")
@@ -122,18 +200,20 @@ func startMainLoop(args *config.Config, logger *zap.SugaredLogger) error {
 				logger.Infof("Processed %s, returned %d new downloads", toParse.DownloadArg.Url.String(), len(toProcess))
 				saveFile(filepath.Join(args.OutputDir, toParse.DownloadArg.FileName), logger, result)
 				for _, downloadArg := range toProcess {
-					downloadCounter.Add(1)
-					downloadQueue <- &downloadArg
+					err := downloadQueue.Offer(&downloadArg)
+					if err != nil {
+						logger.Warnf("Error inserting download into queue: %s", err)
+					}
 				}
-				parsingCounter.Add(-1)
 			}
 			logger.Infoln("Parsing finished")
-			ctxCancel()
-		}()
+			endProgram()
+		}(i)
 	}
 
 	parsePool.Wait()
 	downloadPool.Wait()
+	endProgram()
 	return nil
 }
 
@@ -151,15 +231,16 @@ func saveFile(path string, logger *zap.SugaredLogger, content []byte) {
 	if err != nil {
 		logger.Fatalf("Could not create file %s because of %v", path, err)
 	}
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			logger.Fatalf("Error closing file %s because of %v", path, err)
+		}
+	}()
 	written, err := file.Write(content)
 	logger.Debugf("Written %d bytes", written)
 	if err != nil {
 		logger.Fatalf("Could not write to file %s because of %v", path, err)
-	}
-
-	err = file.Close()
-	if err != nil {
-		logger.Fatalf("Error closing file %s because of %v", path, err)
 	}
 
 	logger.Debugf("Data written into %s", path)
